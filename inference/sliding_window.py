@@ -136,23 +136,20 @@ def receive_permutation(item, permutation, rank_start=0, rank_end=100):
             if k in item['hits'][j + rank_start]:
                 item['hits'][j + rank_start][k] = cut_range[j][k]
 
-        # if 'rank' in item['hits'][j + rank_start]:
-        #     item['hits'][j + rank_start]['rank'] = cut_range[j]['rank']
-        # if 'score' in item['hits'][j + rank_start]:
-        #     item['hits'][j + rank_start]['score'] = cut_range[j]['score']
-        # if 'docid' in item['hits'][j + rank_start]:
-        #     item['hits'][j + rank_start]['docid'] = cut_range[j]['docid']
-
-    # import pdb ; pdb.set_trace()
     return item 
 
 
 from vllm.lora.request import LoRARequest
 
+base_model_name = "Qwen/Qwen2.5-7B-Instruct"
 LORA_PATH = "/mnt/users/x978zhan/paper-backup/rank-wo-gpt/after-acceptance-ECIR/rank-wo-gpt/inference/checkpoints/epoch_2"
-LORA = LoRARequest("lrl-lora", 1, LORA_PATH)
+LORA = LoRARequest(
+    lora_name="lrl-lora",
+    lora_int_id=1,
+    lora_path=LORA_PATH,
+    base_model_name=base_model_name,
+)
 
-# def run_llm(messages, model: LLM, tokenizer: AutoTokenizer):
 def run_llm(messages, model: LLM):
     tokenizer = model.get_tokenizer()
     sampling_params = SamplingParams(temperature=0, top_p=1, max_tokens=256)
@@ -189,11 +186,11 @@ def sliding_windows(model: LLM, item=None, rank_start=0, rank_end=100, window_si
 
 
 def main(model_name, dataset):
-    # tokenizer = AutoTokenizer.from_pretrained(model_name)
-    # model = LLM(model=model_name, tokenizer=model_name, enable_lora=True)
-    tmp = LORA_PATH
-    model = LLM(model=tmp, tokenizer=tmp, enable_lora=True)
-    model_name = "local-epoch-2-lora"
+    model = LLM(model=model_name, tokenizer=model_name, enable_lora=True)
+    # tmp = LORA_PATH
+    # model = LLM(model=tmp, tokenizer=tmp, enable_lora=True)
+    # model_name = "local-epoch-2-lora"
+    model_name += "-epoch-2-lora"
 
     runs, qid2query, docid2doc = load_data(dataset=dataset)
     reranked_runs = {}
@@ -225,31 +222,11 @@ def main(model_name, dataset):
     return reranked_runs
 
 
-def test():
-    passages = PROMPT_TEMPLATE.split('\n')
-    passages = [p.strip() for p in passages if p.strip()]
-    passages = [''.join(p.split(']')[1:]).strip() for p in passages]
-
-    item = {
-        'query': query,
-        'hits': [
-            {'content': p} for p in passages
-        ]
-    }
-
-    model_name = "/u1/x978zhan/src/rank-wo-gpt/checkpoints/Qwen2_5-7B-Instruct"
-    model_name = "Qwen/Qwen2.5-7B-Instruct"
-    model_name = "rank-wo-gpt/Qwen2_5-7B-Instruct"
-    model = LLM(model_name)
-    item = sliding_windows(model, item, rank_start=0, rank_end=20, window_size=20, step=10)
-    print("\n\n\nitem", item)
-
 
 if __name__ == "__main__":
     # test()
 
     dataset = "msmarco-passage/trec-dl-2019"
-    # dataset = "msmarco-passage/trec-dl-2020"
-    # model_name = "Qwen/Qwen2.5-7B-Instruct"
-    model_name = "rank-wo-gpt/Qwen2_5-7B-Instruct"
+    dataset = "msmarco-passage/trec-dl-2020"
+    model_name = "Qwen/Qwen2.5-7B-Instruct"
     main(model_name, dataset)
