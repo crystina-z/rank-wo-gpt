@@ -147,6 +147,10 @@ def receive_permutation(item, permutation, rank_start=0, rank_end=100):
     return item 
 
 
+from vllm.lora.request import LoRARequest
+
+LORA_PATH = "/mnt/users/x978zhan/paper-backup/rank-wo-gpt/after-acceptance-ECIR/rank-wo-gpt/inference/checkpoints/epoch_2"
+LORA = LoRARequest("lrl-lora", 1, LORA_PATH)
 
 # def run_llm(messages, model: LLM, tokenizer: AutoTokenizer):
 def run_llm(messages, model: LLM):
@@ -155,7 +159,7 @@ def run_llm(messages, model: LLM):
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     prompt = prompt.replace("<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n", "")
     prompts = [prompt]
-    outputs = model.generate(prompts, sampling_params, use_tqdm=False)
+    outputs = model.generate(prompts, sampling_params, use_tqdm=False, lora_request=LORA)
     for output in outputs:
         prompt = output.prompt
         generated_text = output.outputs[0].text
@@ -186,7 +190,10 @@ def sliding_windows(model: LLM, item=None, rank_start=0, rank_end=100, window_si
 
 def main(model_name, dataset):
     # tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = LLM(model=model_name, tokenizer=model_name)
+    # model = LLM(model=model_name, tokenizer=model_name, enable_lora=True)
+    tmp = LORA_PATH
+    model = LLM(model=tmp, tokenizer=tmp, enable_lora=True)
+    model_name = "local-epoch-2-lora"
 
     runs, qid2query, docid2doc = load_data(dataset=dataset)
     reranked_runs = {}
