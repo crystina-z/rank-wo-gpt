@@ -37,7 +37,6 @@ def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
         # For Japanese should cut by character: content = content[:int(max_length)]
         content = ' '.join(content.split()[:int(max_length)])
         messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
-        # messages.append({'role': 'assistant', 'content': f'Received passage [{rank}].'})
     messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
 
     return messages
@@ -138,7 +137,6 @@ def get_args():
     model_path = os.path.basename(model_name)
     if lora_path:
         lora_base_path = ".".join(lora_path.strip("/").split("/")[-2:])
-        # model_path += f"-{os.path.basename(lora_path)}"
         model_path += f".LORA-{lora_base_path}"
 
     dataset_path = os.path.basename(dataset)
