@@ -128,13 +128,13 @@ def get_args():
 
     # post-processing of arguments
     args = parser.parse_args()
-    output_dir = args.output_dir
-    model_name = args.model_name
-    lora_path = args.lora_path
-    dataset = args.dataset
+    output_dir = args.output_dir.rstrip("/")
+    model_name = args.model_name.rstrip("/")
+    lora_path = args.lora_path.rstrip("/") if args.lora_path else None
+    dataset = args.dataset.rstrip("/")
 
     config_path = f"window-{args.window_size}-step-{args.step}"
-    model_path = os.path.basename(model_name)
+    model_path = ".".join(model_name.strip("/").split("/")[-2:])
     if lora_path:
         lora_base_path = ".".join(lora_path.strip("/").split("/")[-2:])
         model_path += f".LORA-{lora_base_path}"
