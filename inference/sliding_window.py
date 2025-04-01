@@ -1,6 +1,13 @@
 import copy
+from tqdm import tqdm
+from nirtools.ir import write_runs
+
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
+
+from data import load_data
+from pprint import pprint
+
 
 query = "what does time and a half mean"
 # PROMPT_TEMPLATE = """I will provide you with 20 passages, each indicated by a numerical identifier []. Rank the passages based on their relevance to the search query: what does time and a half mean.
@@ -31,19 +38,51 @@ def get_post_prompt(query, num):
 
 
 def get_prefix_prompt(query, num):
-    return [{'role': 'system',
-             'content': "You are an intelligent assistant that can rank passages based on their relevancy to the query."},
+    return [
+            # {'role': 'system',
+            #  'content': "You are an intelligent assistant that can rank passages based on their relevancy to the query."},
             {'role': 'user',
              'content': f"I will provide you with {num} passages, each indicated by number identifier []. \nRank the passages based on their relevance to query: {query}."},
-            {'role': 'assistant', 'content': 'Okay, please provide the passages.'}]
+            # {'role': 'assistant', 'content': 'Okay, please provide the passages.'}
+        ]
 
 
-def create_permutation_instruction(item=None, rank_start=0, rank_end=100, model_name=''):
+def _create_permutation_instruction(item=None, rank_start=0, rank_end=100):
     query = item['query']
     num = len(item['hits'][rank_start: rank_end])
     # import pdb; pdb.set_trace()
 
     max_length = 300
+
+    messages = get_prefix_prompt(query, num)
+    more_message_contents = []
+    rank = 0
+    for hit in item['hits'][rank_start: rank_end]:
+        rank += 1
+        content = hit['content']
+        content = content.replace('Title: Content: ', '')
+        content = content.strip()
+
+        # For Japanese should cut by character: content = content[:int(max_length)]
+        content = ' '.join(content.split()[:int(max_length)])
+        # messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
+        # messages.append({'role': 'assistant', 'content': f'Received passage [{rank}].'})
+        more_message_contents.append(f"[{rank}] {content}")
+    # messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
+    assert len(messages) == 1
+    messages[0]['content'] += '\n'.join(more_message_contents)
+    messages[0]['content'] += '\n'
+    messages[0]['content'] += get_post_prompt(query, num)
+
+    import pdb ; pdb.set_trace()
+
+    return messages
+
+
+def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
+    query = item['query']
+    num = len(item['hits'][rank_start: rank_end])
+    max_length = 300 # max length per content
 
     messages = get_prefix_prompt(query, num)
     rank = 0
@@ -56,7 +95,7 @@ def create_permutation_instruction(item=None, rank_start=0, rank_end=100, model_
         # For Japanese should cut by character: content = content[:int(max_length)]
         content = ' '.join(content.split()[:int(max_length)])
         messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
-        messages.append({'role': 'assistant', 'content': f'Received passage [{rank}].'})
+        # messages.append({'role': 'assistant', 'content': f'Received passage [{rank}].'})
     messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
 
     return messages
@@ -87,68 +126,99 @@ def receive_permutation(item, permutation, rank_start=0, rank_end=100):
     response = [int(x) - 1 for x in response.split()]
     response = remove_duplicate(response)
     cut_range = copy.deepcopy(item['hits'][rank_start: rank_end])
+
     original_rank = [tt for tt in range(len(cut_range))]
     response = [ss for ss in response if ss in original_rank]
     response = response + [tt for tt in original_rank if tt not in response]
     for j, x in enumerate(response):
         item['hits'][j + rank_start] = copy.deepcopy(cut_range[x])
-        for keys in ['rank', 'score', 'docid']:
-            if keys in item['hits'][j + rank_start]:
-                item['hits'][j + rank_start][keys] = cut_range[j][keys]
+        for k in ['rank', 'score']: # do not need to rewrite docid
+            if k in item['hits'][j + rank_start]:
+                item['hits'][j + rank_start][k] = cut_range[j][k]
+
         # if 'rank' in item['hits'][j + rank_start]:
         #     item['hits'][j + rank_start]['rank'] = cut_range[j]['rank']
         # if 'score' in item['hits'][j + rank_start]:
         #     item['hits'][j + rank_start]['score'] = cut_range[j]['score']
         # if 'docid' in item['hits'][j + rank_start]:
         #     item['hits'][j + rank_start]['docid'] = cut_range[j]['docid']
+
+    # import pdb ; pdb.set_trace()
     return item 
 
 
 
-def run_llm(messages, model_name=''):
-    # model_name = ""
-    model = LLM(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+# def run_llm(messages, model: LLM, tokenizer: AutoTokenizer):
+def run_llm(messages, model: LLM):
+    tokenizer = model.get_tokenizer()
     sampling_params = SamplingParams(temperature=0, top_p=1, max_tokens=256)
-    # messages = [
-    #     {"role": "user", "content": PROMPT_TEMPLATE}
-    # ]
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     prompt = prompt.replace("<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n", "")
     prompts = [prompt]
-    outputs = model.generate(prompts, sampling_params)
+    outputs = model.generate(prompts, sampling_params, use_tqdm=False)
     for output in outputs:
         prompt = output.prompt
         generated_text = output.outputs[0].text
-        print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
-        # import pdb; pdb.set_trace()
+        # print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
 
     return generated_text
 
 
-def permutation_pipeline(item=None, rank_start=0, rank_end=100, model_name=''):
-    messages = create_permutation_instruction(item=item, rank_start=rank_start, rank_end=rank_end,
-                                              model_name=model_name)  # chan
-    # import pdb; pdb.set_trace()
-    permutation = run_llm(messages, model_name=model_name)
+def permutation_pipeline(model: LLM, item=None, rank_start=0, rank_end=100):
+    # TODO: instruction might need to be changed
+    messages = create_permutation_instruction(item=item, rank_start=rank_start, rank_end=rank_end)
+    permutation = run_llm(messages, model) # text
     item = receive_permutation(item, permutation, rank_start=rank_start, rank_end=rank_end)
     return item
 
 
-def sliding_windows(item=None, rank_start=0, rank_end=100, window_size=20, step=10, model_name=''): 
+def sliding_windows(model: LLM, item=None, rank_start=0, rank_end=100, window_size=20, step=10): 
     item = copy.deepcopy(item)
     end_pos = rank_end
     start_pos = rank_end - window_size
     while start_pos >= rank_start:
         start_pos = max(start_pos, rank_start)
-        # import pdb; pdb.set_trace()
-        item = permutation_pipeline(item, start_pos, end_pos, model_name=model_name)
+        item = permutation_pipeline(model, item, start_pos, end_pos)
         end_pos = end_pos - step
         start_pos = start_pos - step
     return item
 
 
-if __name__ == "__main__":
+def main(model_name, dataset):
+    # tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = LLM(model=model_name, tokenizer=model_name)
+
+    runs, qid2query, docid2doc = load_data(dataset=dataset)
+    reranked_runs = {}
+
+    for qid in tqdm(runs):
+        query = qid2query[qid]
+        docids = runs[qid]
+        num_docs = len(docids)
+
+        item = {
+            'query': query,
+            'hits': [
+                {
+                    'content': docid2doc[docid],
+                    'docid': docid,
+                    'rank': rank,
+                } for rank, docid in enumerate(runs[qid])
+            ]
+        }
+        item = sliding_windows(model, item, rank_start=0, rank_end=num_docs, window_size=20, step=10)
+        # item = sliding_windows(model, item, rank_start=0, rank_end=num_docs, window_size=5, step=10)
+        docid2rank = {hit['docid']: hit['rank'] for hit in item['hits']}
+        reranked_runs[qid] = {docid: -rank for docid, rank in docid2rank.items()} # higher the rank, lower the score
+
+    runfile = f"data/{model_name}/{dataset}/reranked_runs.update-prompt.trec"
+    write_runs(reranked_runs, runfile)
+    print(f"Reranked runs written to {runfile}")
+
+    return reranked_runs
+
+
+def test():
     passages = PROMPT_TEMPLATE.split('\n')
     passages = [p.strip() for p in passages if p.strip()]
     passages = [''.join(p.split(']')[1:]).strip() for p in passages]
@@ -161,5 +231,18 @@ if __name__ == "__main__":
     }
 
     model_name = "/u1/x978zhan/src/rank-wo-gpt/checkpoints/Qwen2_5-7B-Instruct"
-    item = sliding_windows(item, rank_start=0, rank_end=20, window_size=20, step=10, model_name=model_name)
+    model_name = "Qwen/Qwen2.5-7B-Instruct"
+    model_name = "rank-wo-gpt/Qwen2_5-7B-Instruct"
+    model = LLM(model_name)
+    item = sliding_windows(model, item, rank_start=0, rank_end=20, window_size=20, step=10)
     print("\n\n\nitem", item)
+
+
+if __name__ == "__main__":
+    # test()
+
+    dataset = "msmarco-passage/trec-dl-2019"
+    # dataset = "msmarco-passage/trec-dl-2020"
+    # model_name = "Qwen/Qwen2.5-7B-Instruct"
+    model_name = "rank-wo-gpt/Qwen2_5-7B-Instruct"
+    main(model_name, dataset)
