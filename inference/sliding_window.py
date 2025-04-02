@@ -126,6 +126,9 @@ def get_args():
     parser.add_argument("--step", "-step", type=int, default=10)
     parser.add_argument("--output_dir", "-o", type=str, default="rerank-results/") 
 
+    parser.add_argument("--tensor_parallel_size", "-device", type=int, default=1) 
+    parser.add_argument("--seed", "-seed", type=int, default=42) 
+
     # post-processing of arguments
     args = parser.parse_args()
     output_dir = args.output_dir.rstrip("/")
@@ -160,22 +163,32 @@ def get_lora_request(model_name, lora_path):
 
 
 def main(args):
+    seed = args.seed
     dataset, model_name, lora_path = args.dataset, args.model_name, args.lora_path
     window_size, step = args.window_size, args.step
     output_dir = args.output_dir
-    output_file = os.path.join(output_dir, "rank-wo-gpt.trec")
+    output_file = os.path.join(output_dir, f"rank-wo-gpt-{seed}.trec")
+
     if os.path.exists(output_file):
         print(f"Reranked runs already exist in {output_file}")
         evaluate(output_file, dataset)
         return
-    
+ 
     print(f"Saving reranked runs to {output_file}...")
 
+    model_kwargs = dict(
+        model=model_name,
+        tokenizer=model_name,
+        seed=seed,
+        quantization="fp8",
+        gpu_memory_utilization=0.9,
+        tensor_parallel_size=args.tensor_parallel_size,
+    )
     if not lora_path:
-        model = LLM(model=model_name, tokenizer=model_name)
+        model = LLM(**model_kwargs)
         lora_request = None
     else:
-        model = LLM(model=model_name, tokenizer=model_name, enable_lora=True)
+        model = LLM(**model_kwargs, enable_lora=True)
         lora_request = get_lora_request(model_name, lora_path)
 
     runs, qid2query, docid2doc = load_data(dataset=dataset)
