@@ -79,16 +79,16 @@ def receive_permutation(item, permutation, rank_start=0, rank_end=100):
     return item 
 
 
-def run_llm(messages, model: LLM, lora_request: LoRARequest = None):
+def run_llm(messages, model: LLM, lora_request: LoRARequest = None, args = None):
     tokenizer = model.get_tokenizer()
-    sampling_params = SamplingParams(temperature=0, top_p=1, max_tokens=256)
+    sampling_params = SamplingParams(temperature=args.temperature, top_p=1, max_tokens=256)
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     prompt = prompt.replace("<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n", "")
     prompts = [prompt]
     if lora_request is not None:
-        outputs = model.generate(prompts, sampling_params, use_tqdm=False, lora_request=lora_request)
+        outputs = model.generate(prompts, use_tqdm=False, lora_request=lora_request, sampling_params=sampling_params)
     else:
-        outputs = model.generate(prompts, sampling_params, use_tqdm=False)
+        outputs = model.generate(prompts, use_tqdm=False, sampling_params=sampling_params)
 
     for output in outputs:
         prompt = output.prompt
@@ -97,21 +97,21 @@ def run_llm(messages, model: LLM, lora_request: LoRARequest = None):
     return generated_text
 
 
-def permutation_pipeline(model: LLM, lora_request: LoRARequest, item=None, rank_start=0, rank_end=100):
+def permutation_pipeline(model: LLM, lora_request: LoRARequest, item=None, rank_start=0, rank_end=100, args = None):
     # TODO: instruction might need to be changed
     messages = create_permutation_instruction(item=item, rank_start=rank_start, rank_end=rank_end)
-    permutation = run_llm(messages, model, lora_request) # text
+    permutation = run_llm(messages, model, lora_request, args) # text
     item = receive_permutation(item, permutation, rank_start=rank_start, rank_end=rank_end)
     return item
 
 
-def sliding_windows(model: LLM, lora_request: LoRARequest, item=None, rank_start=0, rank_end=100, window_size=20, step=10): 
+def sliding_windows(model: LLM, lora_request: LoRARequest, item=None, rank_start=0, rank_end=100, window_size=20, step=10, args = None): 
     item = copy.deepcopy(item)
     end_pos = rank_end
     start_pos = rank_end - window_size
     while start_pos >= rank_start:
         start_pos = max(start_pos, rank_start)
-        item = permutation_pipeline(model, lora_request, item, start_pos, end_pos)
+        item = permutation_pipeline(model, lora_request, item, start_pos, end_pos, args)
         end_pos = end_pos - step
         start_pos = start_pos - step
     return item
@@ -128,6 +128,7 @@ def get_args():
 
     parser.add_argument("--tensor_parallel_size", "-device", type=int, default=1) 
     parser.add_argument("--seed", "-seed", type=int, default=42) 
+    parser.add_argument("--temperature", "-temperature", type=float, default=0.25)
 
     # post-processing of arguments
     args = parser.parse_args()
@@ -164,10 +165,11 @@ def get_lora_request(model_name, lora_path):
 
 def main(args):
     seed = args.seed
+    temperature = args.temperature
     dataset, model_name, lora_path = args.dataset, args.model_name, args.lora_path
     window_size, step = args.window_size, args.step
     output_dir = args.output_dir
-    output_file = os.path.join(output_dir, f"rank-wo-gpt-{seed}.trec")
+    output_file = os.path.join(output_dir, f"rank-wo-gpt-Seed-{seed}-Temp-{temperature}.trec")
 
     if os.path.exists(output_file):
         print(f"Reranked runs already exist in {output_file}")
@@ -176,6 +178,7 @@ def main(args):
  
     print(f"Saving reranked runs to {output_file}...")
 
+
     model_kwargs = dict(
         model=model_name,
         tokenizer=model_name,
@@ -183,6 +186,8 @@ def main(args):
         quantization="fp8",
         gpu_memory_utilization=0.9,
         tensor_parallel_size=args.tensor_parallel_size,
+        dtype="bfloat16",
+        # sampling_params=sampling_params,
     )
     if not lora_path:
         model = LLM(**model_kwargs)
@@ -191,6 +196,7 @@ def main(args):
         model = LLM(**model_kwargs, enable_lora=True)
         lora_request = get_lora_request(model_name, lora_path)
 
+    # import pdb ; pdb.set_trace()
     runs, qid2query, docid2doc = load_data(dataset=dataset)
 
     reranked_runs = {}
@@ -209,7 +215,7 @@ def main(args):
                 } for rank, docid in enumerate(runs[qid])
             ]
         }
-        item = sliding_windows(model, lora_request, item, rank_start=0, rank_end=num_docs, window_size=window_size, step=step)
+        item = sliding_windows(model, lora_request, item, rank_start=0, rank_end=num_docs, window_size=window_size, step=step, args=args)
         docid2rank = {hit['docid']: hit['rank'] for hit in item['hits']}
         reranked_runs[qid] = {docid: -rank for docid, rank in docid2rank.items()} # higher the rank, lower the score
 
