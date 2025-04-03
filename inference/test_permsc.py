@@ -8,13 +8,13 @@ from nirtools.ir import load_runs, write_runs
 from permsc import KemenyOptimalAggregator, sum_kendall_tau, ranks_from_preferences
 
 
-TOPK = 10
+TOPK = 20
 
 
 def test_basic():
-    preferences = np.array([[1, 2, 0, 3], [1, 2, 3, 0], [1, 2, 0, 3]])
+    preferences = np.array([[1, 2, 0, 3], [1, 2, 3, 0], [1, 2, 0, 4]])
     ranks = ranks_from_preferences(preferences)
-
+    # import pdb; pdb.set_trace()
     y_optimal = KemenyOptimalAggregator().aggregate(preferences)
     y_optimal_ranks = ranks_from_preferences(y_optimal)
     print(y_optimal)  # [1, 2, 0, 3]
@@ -39,7 +39,11 @@ class IndexOrganizer:
     def to_doc_id(self, int_id: int) -> str:
         return self.int_id_to_doc_id[int_id]
 
-    def convert_docIds_to_intIds(self, doc_ids: list) -> list:
+    def convert_docIds_to_intIds(self, doc_ids: list, add_missing: bool = True) -> list:
+        if add_missing:
+            missing_docs = list(set(self.unique_doc_ids) - set(doc_ids))
+            doc_ids += missing_docs
+
         return [self.to_int_id(doc_id) for doc_id in doc_ids]
 
     def convert_intIds_to_docIds(self, int_ids: list) -> list:
@@ -57,8 +61,8 @@ def aggregate_doc_ids(list_of_docids):
     preferences = np.array(list_of_int_ids)
     print(f"Preferences shape: {preferences.shape}")
     print(f"Number of unique documents: {len(id_organizer.unique_doc_ids)}")
-    # ranks = ranks_from_preferences(preferences)
-    # import pdb; pdb.set_trace()
+    ranks = ranks_from_preferences(preferences)
+    import pdb; pdb.set_trace()
 
     y_optimal = KemenyOptimalAggregator().aggregate(preferences)
     # y_optimal_ranks = ranks_from_preferences(y_optimal)
@@ -98,8 +102,8 @@ def main():
             doc_id: - rank for rank, doc_id in enumerate(optimal_doc_ids) # score: -rank; smaller the rank, higher the score
         }
 
-    import pdb; pdb.set_trace()
-    write_runs(psc_runs, "test-psc-2019.trec")
+    # import pdb; pdb.set_trace()
+    write_runs(psc_runs, f"test-psc-2019.{TOPK}.trec")
 
 
 
