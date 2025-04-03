@@ -31,9 +31,8 @@ model:
 
 tokenizer:
   _component_: torchtune.models.llama3.llama3_tokenizer
-  path: ./models/Llama-3.1-8B-Instruct/vocab.json
-  merges_file: ./models/Llama-3.1-8B-Instruct/merges.txt
-  max_seq_len: null
+  path: models/Llama-3.1-8B-Instruct/original/tokenizer.model
+  max_seq_len: 1024
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
