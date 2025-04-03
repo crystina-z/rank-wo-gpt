@@ -14,7 +14,6 @@ TOPK = 20
 def test_basic():
     preferences = np.array([[1, 2, 0, 3], [1, 2, 3, 0], [1, 2, 0, 4]])
     ranks = ranks_from_preferences(preferences)
-    # import pdb; pdb.set_trace()
     y_optimal = KemenyOptimalAggregator().aggregate(preferences)
     y_optimal_ranks = ranks_from_preferences(y_optimal)
     print(y_optimal)  # [1, 2, 0, 3]
@@ -61,14 +60,13 @@ def aggregate_doc_ids(list_of_docids):
     preferences = np.array(list_of_int_ids)
     print(f"Preferences shape: {preferences.shape}")
     print(f"Number of unique documents: {len(id_organizer.unique_doc_ids)}")
-    ranks = ranks_from_preferences(preferences)
-    import pdb; pdb.set_trace()
 
     y_optimal = KemenyOptimalAggregator().aggregate(preferences)
-    # y_optimal_ranks = ranks_from_preferences(y_optimal)
-    # print(y_optimal)  # [1, 2, 0, 3]
-    # print(sum_kendall_tau(ranks, y_optimal_ranks))  # the sum of the Kendall tau distances
     optimal_doc_ids = id_organizer.convert_intIds_to_docIds(y_optimal)
+
+    # ranks = ranks_from_preferences(preferences)
+    # y_optimal_ranks = ranks_from_preferences(y_optimal)
+    # print(sum_kendall_tau(ranks, y_optimal_ranks))  # the sum of the Kendall tau distances
 
     return optimal_doc_ids
 
@@ -93,7 +91,6 @@ def load_runfiles(runfile_pattern: str):
 def main():
     pattern = "rerank-results/Qwen.Qwen2.5-7B-Instruct/window-20-step-10/trec-dl-2019/rank-wo-gpt-Seed-*-Temp-0.25.trec"
     initial_runs = load_runfiles(pattern)
-    # import pdb; pdb.set_trace()
 
     psc_runs = {}
     for qid in tqdm(initial_runs, desc="Aggregating runs"):
@@ -102,7 +99,6 @@ def main():
             doc_id: - rank for rank, doc_id in enumerate(optimal_doc_ids) # score: -rank; smaller the rank, higher the score
         }
 
-    # import pdb; pdb.set_trace()
     write_runs(psc_runs, f"test-psc-2019.{TOPK}.trec")
 
 
