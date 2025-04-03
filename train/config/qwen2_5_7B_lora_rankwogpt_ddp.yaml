@@ -31,13 +31,13 @@ model:
 
 tokenizer:
   _component_: torchtune.models.qwen2_5.qwen2_5_tokenizer
-  path: ./Qwen2_5-7B-Instruct/vocab.json
-  merges_file: ./Qwen2_5-7B-Instruct/merges.txt
+  path: ./Qwen2.5-7B-Instruct/vocab.json
+  merges_file: ./Qwen2.5-7B-Instruct/merges.txt
   max_seq_len: null
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: ./Qwen2_5-7B-Instruct
+  checkpoint_dir: ./Qwen2.5-7B-Instruct
   checkpoint_files: [
     model-00001-of-00004.safetensors,
     model-00002-of-00004.safetensors,
@@ -61,7 +61,7 @@ dataset:
   packed: False  # True increases speed
 seed: null
 shuffle: True
-batch_size: 2
+batch_size: 1
 
 # Optimizer and Scheduler
 optimizer:
@@ -79,8 +79,9 @@ loss:
 # Training
 epochs: 1
 max_steps_per_epoch: null
-gradient_accumulation_steps: 8  # Use to increase effective batch size
-compile: False  # torch.compile the model + loss, True increases speed + decreases memory
+gradient_accumulation_steps: 16  # Use to increase effective batch size
+# compile: False  # torch.compile the model + loss, True increases speed + decreases memory
+compile: True  # torch.compile the model + loss, True increases speed + decreases memory
 
 # Logging
 metric_logger:
