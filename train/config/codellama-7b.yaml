@@ -1,27 +1,25 @@
-# Config for multi-device LoRA finetuning in lora_finetune_distributed.py
-# using a Llama3.1 8B Instruct model
+# Config for single device full finetuning in full_finetune_single_device.py
+# using a CodeLlama 7B model
 #
 # This config assumes that you've run the following command before launching
 # this run:
-#   tune download meta-llama/Meta-Llama-3.1-8B-Instruct --output-dir /tmp/Meta-Llama-3.1-8B-Instruct --ignore-patterns "original/consolidated.00.pth"
+#   tune download meta-llama/CodeLlama-7b-hf --output-dir /tmp/CodeLlama-7b-hf
 #
-# To launch on 2 devices, run the following command from root:
-#   tune run --nproc_per_node 2 lora_finetune_distributed --config llama3_1/8B_lora
+# To launch on a single device, run the following command from root:
+#   tune run lora_finetune_single_device --config code_llama2/7B_lora_single_device
 #
 # You can add specific overrides through the command line. For example
 # to override the checkpointer directory while launching training
 # you can run:
-#   tune run --nproc_per_node 2 lora_finetune_distributed --config llama3_1/8B_lora checkpointer.checkpoint_dir=<YOUR_CHECKPOINT_DIR>
+#   tune run lora_finetune_single_device --config code_llama2/7B_lora_single_device checkpointer.checkpoint_dir=<YOUR_CHECKPOINT_DIR>
 #
-# This config works best when the model is being fine-tuned on 2+ GPUs.
-# For single device LoRA finetuning please use 8B_lora_single_device.yaml
-# or 8B_qlora_single_device.yaml
+# This config works only for training on single device.
 
-output_dir: checkpoints/llama-3-8b/lora # /tmp may be deleted by your system. Change it to your preference.
+output_dir: ./checkpoints/codellama-7b/lora # /tmp may be deleted by your system. Change it to your preference.
 
 # Model Arguments
 model:
-  _component_: torchtune.models.llama3_1.lora_llama3_1_8b
+  _component_: torchtune.models.code_llama2.lora_code_llama2_7b
   lora_attn_modules: ['q_proj', 'v_proj', 'output_proj']
   apply_lora_to_mlp: True
   apply_lora_to_output: False
@@ -31,32 +29,30 @@ model:
 
 # Tokenizer
 tokenizer:
-  _component_: torchtune.models.llama3.llama3_tokenizer
-  path: models/Llama-3.1-8B-Instruct/original/tokenizer.model
+  _component_: torchtune.models.llama2.llama2_tokenizer
+  path: ./models/CodeLlama-7b-Instruct-hf/tokenizer.model
   max_seq_len: null
 
+# Checkpointer
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: models/Llama-3.1-8B-Instruct/
+  checkpoint_dir: ./models/CodeLlama-7b-Instruct-hf
   checkpoint_files: [
-    model-00001-of-00004.safetensors,
-    model-00002-of-00004.safetensors,
-    model-00003-of-00004.safetensors,
-    model-00004-of-00004.safetensors,
+    pytorch_model-00001-of-00003.bin,
+    pytorch_model-00002-of-00003.bin,
+    pytorch_model-00003-of-00003.bin
   ]
+  adapter_checkpoint: null
   recipe_checkpoint: null
   output_dir: ${output_dir}
-  model_type: LLAMA3
+  model_type: LLAMA2
 resume_from_checkpoint: False
-save_adapter_weights_only: True 
+save_adapter_weights_only: False
 
-# Dataset and Sampler
+# Dataset
 # dataset:
 #   _component_: torchtune.datasets.alpaca_cleaned_dataset
 #   packed: False  # True increases speed
-# seed: null
-# shuffle: True
-# batch_size: 2
 dataset:
   _component_: torchtune.datasets.chat_dataset
   source: json
@@ -71,7 +67,14 @@ shuffle: True
 batch_size: 2
 
 
-# Optimizer and Scheduler
+seed: null
+shuffle: True
+
+# Fine-tuning arguments
+epochs: 1
+max_steps_per_epoch: null
+batch_size: 2
+gradient_accumulation_steps: 8  # Use to increase effective batch size
 optimizer:
   _component_: torch.optim.AdamW
   fused: True
@@ -80,16 +83,18 @@ optimizer:
 lr_scheduler:
   _component_: torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup
   num_warmup_steps: 100
-
 loss:
   _component_: torchtune.modules.loss.CEWithChunkedOutputLoss
-
-# Training
-epochs: 1
-max_steps_per_epoch: null
-gradient_accumulation_steps: 8  # Use to increase effective batch size
 clip_grad_norm: null
-compile: True  # torch.compile the model + loss, True increases speed + decreases memory
+compile: False  # torch.compile the model + loss, True increases speed + decreases memory
+
+# Training env
+device: cuda
+
+# Memory management
+enable_activation_checkpointing: True  # True reduces memory
+enable_activation_offloading: False  # True reduces memory
+dtype: bf16
 
 # Logging
 metric_logger:
@@ -98,19 +103,14 @@ metric_logger:
 log_every_n_steps: 1
 log_peak_memory_stats: True
 
-# Environment
-device: cuda
-dtype: bf16
-enable_activation_checkpointing: False  # True reduces memory
-enable_activation_offloading: False  # True reduces memory
-
-# Profiler (disabled)
+# Showcase the usage of PyTorch profiler
+# Set enabled to False as it's only needed for debugging training
 profiler:
   _component_: torchtune.training.setup_torch_profiler
   enabled: False
 
   #Output directory of trace artifacts
-  output_dir: ${output_dir}/profiling_outputs
+  output_dir: /tmp/CodeLlama-7b-hf/profiling_outputs
 
   #`torch.profiler.ProfilerActivity` types to trace
   cpu: True
@@ -125,6 +125,6 @@ profiler:
   # `torch.profiler.schedule` options:
   # wait_steps -> wait, warmup_steps -> warmup, active_steps -> active, num_cycles -> repeat
   wait_steps: 5
-  warmup_steps: 3
+  warmup_steps: 5
   active_steps: 2
   num_cycles: 1
