@@ -20,8 +20,37 @@ def get_prefix_prompt(query, num):
             {'role': 'user', 'content': f"I will provide you with {num} passages, each indicated by number identifier []. \nRank the passages based on their relevance to query: {query}."},
     ]
 
-
+# NOTE: THIS IS FOR CODE-LLAMA
 def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
+    query = item['query']
+    num = len(item['hits'][rank_start: rank_end])
+    # import pdb; pdb.set_trace()
+
+    max_length = 300
+
+    messages = get_prefix_prompt(query, num)
+    more_message_contents = []
+    rank = 0
+    for hit in item['hits'][rank_start: rank_end]:
+        rank += 1
+        content = hit['content']
+        content = content.replace('Title: Content: ', '')
+        content = content.strip()
+
+        # For Japanese should cut by character: content = content[:int(max_length)]
+        content = ' '.join(content.split()[:int(max_length)])
+        # messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
+        # messages.append({'role': 'assistant', 'content': f'Received passage [{rank}].'})
+        more_message_contents.append(f"[{rank}] {content}")
+    # messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
+    assert len(messages) == 1
+    messages[0]['content'] += '\n'.join(more_message_contents)
+    messages[0]['content'] += '\n'
+    messages[0]['content'] += get_post_prompt(query, num)
+
+    return messages
+
+def _create_permutation_instruction(item=None, rank_start=0, rank_end=100):
     query = item['query']
     num = len(item['hits'][rank_start: rank_end])
     max_length = 300 # max length per content
@@ -120,6 +149,7 @@ def sliding_windows(model: LLM, lora_request: LoRARequest, item=None, rank_start
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", "-model", type=str, default="Qwen/Qwen2.5-7B-Instruct")
+    parser.add_argument("--tokenizer_name", "-tokenizer", type=str, default=None)
     parser.add_argument("--lora_path", "-lora", type=str, default=None)
     parser.add_argument("--dataset", "-d", type=str, default="msmarco-passage/trec-dl-2019")
     parser.add_argument("--window_size", "-window", type=int, default=20)
@@ -138,9 +168,9 @@ def get_args():
     dataset = args.dataset.rstrip("/")
 
     config_path = f"window-{args.window_size}-step-{args.step}"
-    model_path = ".".join(model_name.strip("/").split("/")[-2:])
+    model_path = ".".join(model_name.strip("/").split("/")[-3:])
     if lora_path:
-        lora_base_path = ".".join(lora_path.strip("/").split("/")[-2:])
+        lora_base_path = ".".join(lora_path.strip("/").split("/")[-3:])
         model_path += f".LORA-{lora_base_path}"
 
     dataset_path = os.path.basename(dataset)
@@ -167,6 +197,7 @@ def main(args):
     seed = args.seed
     temperature = args.temperature
     dataset, model_name, lora_path = args.dataset, args.model_name, args.lora_path
+    tokenizer_name = args.tokenizer_name
     window_size, step = args.window_size, args.step
     output_dir = args.output_dir
     output_file = os.path.join(output_dir, f"rank-wo-gpt-Seed-{seed}-Temp-{temperature}.trec")
@@ -181,9 +212,9 @@ def main(args):
 
     model_kwargs = dict(
         model=model_name,
-        tokenizer=model_name,
+        tokenizer=model_name if not tokenizer_name else tokenizer_name,
         seed=seed,
-        quantization="fp8",
+        # quantization="fp8",
         gpu_memory_utilization=0.9,
         tensor_parallel_size=args.tensor_parallel_size,
         dtype="bfloat16",
