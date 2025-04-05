@@ -48,15 +48,9 @@ checkpointer:
   output_dir: ${output_dir}
   model_type: LLAMA3
 resume_from_checkpoint: False
-save_adapter_weights_only: True 
+save_adapter_weights_only: False
 
 # Dataset and Sampler
-# dataset:
-#   _component_: torchtune.datasets.alpaca_cleaned_dataset
-#   packed: False  # True increases speed
-# seed: null
-# shuffle: True
-# batch_size: 2
 dataset:
   _component_: torchtune.datasets.chat_dataset
   source: json
@@ -87,7 +81,7 @@ loss:
 # Training
 epochs: 1
 max_steps_per_epoch: null
-gradient_accumulation_steps: 8  # Use to increase effective batch size
+gradient_accumulation_steps: 4  # Use to increase effective batch size
 clip_grad_norm: null
 compile: True  # torch.compile the model + loss, True increases speed + decreases memory
 

@@ -64,17 +64,13 @@ dataset:
   packed: False  # True increases speed
 seed: null
 shuffle: True
-batch_size: 2
 
-
-seed: null
-shuffle: True
 
 # Fine-tuning arguments
 epochs: 1
 max_steps_per_epoch: null
 batch_size: 2
-gradient_accumulation_steps: 8  # Use to increase effective batch size
+gradient_accumulation_steps: 4  # Use to increase effective batch size
 optimizer:
   _component_: torch.optim.AdamW
   fused: True
