@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
-merge_and_push_peft_model.py
+merge_lora.py
 
 Usage:
-  python merge_and_push_peft_model.py \
+  python merge_lora.py \
       --base_model_name base/model \
       --peft_model_name your-username/peft-model \
       --auth_token YOUR_HF_TOKEN
