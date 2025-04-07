@@ -6,7 +6,6 @@ from tqdm import tqdm
 from nirtools.ir import write_runs
 
 from vllm import LLM, SamplingParams
-from vllm.lora.request import LoRARequest
 
 from data import load_data
 from evaluate import evaluate
@@ -21,11 +20,9 @@ def get_prefix_prompt(query, num):
             {'role': 'user', 'content': f"I will provide you with {num} passages, each indicated by number identifier []. \nRank the passages based on their relevance to query: {query}."},
     ]
 
-# NOTE: THIS IS FOR CODE-LLAMA
 def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
     query = item['query']
     num = len(item['hits'][rank_start: rank_end])
-    # import pdb; pdb.set_trace()
 
     max_length = 300
 
@@ -38,39 +35,14 @@ def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
         content = content.replace('Title: Content: ', '')
         content = content.strip()
 
-        # For Japanese should cut by character: content = content[:int(max_length)]
         content = ' '.join(content.split()[:int(max_length)])
-        # messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
-        # messages.append({'role': 'assistant', 'content': f'Received passage [{rank}].'})
         more_message_contents.append(f"[{rank}] {content}")
-    # messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
     assert len(messages) == 1
     messages[0]['content'] += '\n'.join(more_message_contents)
     messages[0]['content'] += '\n'
     messages[0]['content'] += get_post_prompt(query, num)
 
     return messages
-
-def _create_permutation_instruction(item=None, rank_start=0, rank_end=100):
-    query = item['query']
-    num = len(item['hits'][rank_start: rank_end])
-    max_length = 300 # max length per content
-
-    messages = get_prefix_prompt(query, num)
-    rank = 0
-    for hit in item['hits'][rank_start: rank_end]:
-        rank += 1
-        content = hit['content']
-        content = content.replace('Title: Content: ', '')
-        content = content.strip()
-
-        # For Japanese should cut by character: content = content[:int(max_length)]
-        content = ' '.join(content.split()[:int(max_length)])
-        messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
-    messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
-
-    return messages
-
 
 def clean_response(response: str):
     new_response = ''
@@ -152,7 +124,6 @@ def get_args():
     parser.add_argument("--window_size", "-window", type=int, default=20)
     parser.add_argument("--step", "-step", type=int, default=10)
     parser.add_argument("--output_dir", "-o", type=str, default="rerank-results/") 
-    parser.add_argument("--lora_path", "-lora", type=str, default=None)
 
     parser.add_argument("--tensor_parallel_size", "-device", type=int, default=1) 
     parser.add_argument("--seed", "-seed", type=int, default=42) 
@@ -183,15 +154,6 @@ def get_args():
     return args
 
 
-def get_lora_request(model_name, lora_path):
-    return LoRARequest(
-        lora_name="lora",
-        lora_int_id=1,
-        lora_path=lora_path,
-        base_model_name=model_name,
-    )
-
-
 def main(args):
     seed = args.seed
     temperature = args.temperature
@@ -199,7 +161,6 @@ def main(args):
     tokenizer_name = args.tokenizer_name
     window_size, step = args.window_size, args.step
     output_dir = args.output_dir
-    lora_path = args.lora_path
     output_file = os.path.join(output_dir, f"rank-wo-gpt-Seed-{seed}-Temp-{temperature}.trec")
 
     if os.path.exists(output_file):
@@ -218,6 +179,7 @@ def main(args):
         gpu_memory_utilization=0.9,
         tensor_parallel_size=args.tensor_parallel_size,
         dtype="bfloat16",
+        # sampling_params=sampling_params,
     )
     model = LLM(**model_kwargs)
 
