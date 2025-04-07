@@ -1,3 +1,4 @@
+import random
 import os
 import copy
 import argparse
@@ -159,6 +160,7 @@ def get_args():
     parser.add_argument("--tensor_parallel_size", "-device", type=int, default=1) 
     parser.add_argument("--seed", "-seed", type=int, default=42) 
     parser.add_argument("--temperature", "-temperature", type=float, default=0.25)
+    parser.add_argument("--shuffle", "-shuffle", type=bool, default=False)
 
     # post-processing of arguments
     args = parser.parse_args()
@@ -174,10 +176,14 @@ def get_args():
         model_path += f".LORA-{lora_base_path}"
 
     dataset_path = os.path.basename(dataset)
+    if args.shuffle:
+        output_dir += f".shuffle"
+
     output_dir = os.path.join(
         output_dir,
         model_path, config_path, dataset_path,
     )
+
     os.makedirs(output_dir, exist_ok=True)
     args.output_dir = output_dir
 
@@ -227,7 +233,6 @@ def main(args):
         model = LLM(**model_kwargs, enable_lora=True)
         lora_request = get_lora_request(model_name, lora_path)
 
-    # import pdb ; pdb.set_trace()
     runs, qid2query, docid2doc = load_data(dataset=dataset)
 
     reranked_runs = {}
@@ -236,6 +241,12 @@ def main(args):
         docids = runs[qid]
         num_docs = len(docids)
 
+        if isinstance(docids, dict):
+            docids = sorted(docids.keys(), key=lambda x: docids[x], reverse=True)
+
+        if args.shuffle:
+            random.shuffle(docids)
+
         item = {
             'query': query,
             'hits': [
@@ -243,7 +254,7 @@ def main(args):
                     'content': docid2doc[docid],
                     'docid': docid,
                     'rank': rank,
-                } for rank, docid in enumerate(runs[qid])
+                } for rank, docid in enumerate(docids)
             ]
         }
         item = sliding_windows(model, lora_request, item, rank_start=0, rank_end=num_docs, window_size=window_size, step=step, args=args)

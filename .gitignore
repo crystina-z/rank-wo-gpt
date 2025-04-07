@@ -6,3 +6,4 @@ sbatch.sh
 
 wandb/
 Qwen2.5-7B-Instruct/
+models/
