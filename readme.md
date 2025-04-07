@@ -20,7 +20,8 @@ tune download $hgf_model_name --output-dir model/$(basename $hgf_model_name)
 ```
 
 ### Download Training Data
-Name the data as `rankwogpt-data.json`
+Name the data as `rankwogpt-data.json`. A sample of training data format is given in `rankwogpt-data.sample.json`. 
+Data preparing script will be reason soon.
 
 
 ### Run SFT
@@ -40,13 +41,28 @@ pip install -r inference/requirements.txt
 
 ### Run Sliding Window
 ```
-python sliding_window.py -device 1 --temperature 0 --seed 42 \
-    -d msmarco-passage/trec-dl-2019 \
+python sliding_window.py -device 1 \
+    --temperature 0 --seed 42 \
+    --dataset msmarco-passage/trec-dl-2019 \
     -window 20 -step 10 \
-    -model codellama/CodeLlama-13b-Instruct-hf # <-- change to out-of-box huggingface models or models reproduced by above SFT step 
+    -model ${model_path} # <-- change to out-of-box huggingface models or models reproduced by above SFT step 
+    -tokenizer Qwen/Qwen2.5-7B-Instruct \
+    -shuffle False # <-- switch on to test the consistency regarding shuffled document candidates
 ```
-where `device` controls how many GPU devices to run on.
+where `device` controls how many GPU devices to run on,
+and `model_path` is the path to the merged model weights.
+We removed the support of loading LORA weights due to efficiency reasons.
+If you only have adapter weights, [`train/merge_lora.py`](train/merge_lora.py) provides the script to merge LORA weights into the base model.
 
+
+### Consistency Regarding Shuffled Inputs 
+We observed that newer models (e.g., Qwen) are rather robust againt the shuffled inputs,
+we provied script to run [Permutation Self-Consistency](https://github.com/castorini/perm-sc) on ranking task.
+To run perm-sc, first [install the package following their description](https://github.com/castorini/perm-sc?tab=readme-ov-file#installation).
+Then:
+```
+
+```
 
 
 # Citation
