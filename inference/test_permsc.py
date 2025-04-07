@@ -1,4 +1,5 @@
 import glob
+import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -89,7 +90,12 @@ def load_runfiles(runfile_pattern: str):
 
 
 def main():
-    pattern = "rerank-results/Qwen.Qwen2.5-7B-Instruct/window-20-step-10/trec-dl-2019/rank-wo-gpt-Seed-*-Temp-0.25.trec"
+    # dataset = "trec-dl-2019"
+    dataset = "trec-dl-2020"
+
+    # pattern = "rerank-results/Qwen.Qwen2.5-7B-Instruct/window-20-step-10/trec-dl-2019/rank-wo-gpt-Seed-*-Temp-0.25.trec"
+    # pattern = f"rerank-results/qwen2_5_7B.epoch_2/window-20-step-10/{dataset}/rank-wo-gpt-Seed-*-Temp-0.25.trec"
+    pattern = f"rerank-results.shuffle/qwen2_5_7B.lora.epoch_0.basilisk/window-20-step-10/{dataset}/rank-wo-gpt-Seed-*-Temp-0.25.trec"
     initial_runs = load_runfiles(pattern)
 
     psc_runs = {}
@@ -99,7 +105,13 @@ def main():
             doc_id: - rank for rank, doc_id in enumerate(optimal_doc_ids) # score: -rank; smaller the rank, higher the score
         }
 
-    write_runs(psc_runs, f"test-psc-2019.{TOPK}.trec")
+    output_dir = os.path.join(
+        os.path.dirname(pattern), "psc-aggregated"
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    write_runs(psc_runs, f"{output_dir}/psc-{dataset}.{TOPK}.trec")
+
+    print(f"PSC runs saved to {output_dir}/psc-{dataset}.{TOPK}.trec")
 
 
 
