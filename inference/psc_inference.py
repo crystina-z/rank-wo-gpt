@@ -62,11 +62,7 @@ def remove_duplicate(response: list):
     return new_response
 
 
-# def receive_permutation(item, permutation, rank_start=0, rank_end=100):
 def receive_permutation(item, response, rank_start=0, rank_end=100):
-    # response = clean_response(permutation)
-    # response = [int(x) - 1 for x in response.split()]
-    # response = remove_duplicate(response)
     cut_range = copy.deepcopy(item['hits'][rank_start: rank_end])
 
     original_rank = [tt for tt in range(len(cut_range))]
@@ -106,8 +102,7 @@ def permutation_pipeline(model: LLM, item=None, rank_start=0, rank_end=100, args
     # TODO: instruction might need to be changed
     messages = create_permutation_instruction(item=item, rank_start=rank_start, rank_end=rank_end)
     response_list = []
-    for seed in range(20):
-    # for seed in range(2):
+    for seed in range(args.num_seeds):
         args.seed = seed
         permutation = run_llm(messages, model, args) # text
         response = post_process_permutation(permutation)
@@ -115,8 +110,6 @@ def permutation_pipeline(model: LLM, item=None, rank_start=0, rank_end=100, args
 
     response = aggregate_doc_ids(response_list)
     item = receive_permutation(item, response, rank_start=rank_start, rank_end=rank_end)
-    # import pdb; pdb.set_trace()
-    # item = receive_permutation(item, permutation, rank_start=rank_start, rank_end=rank_end)
     return item
 
 
@@ -142,7 +135,7 @@ def get_args():
     parser.add_argument("--output_dir", "-o", type=str, default="rerank-results/") 
 
     parser.add_argument("--tensor_parallel_size", "-device", type=int, default=1) 
-    parser.add_argument("--seed", "-seed", type=int, default=42) 
+    parser.add_argument("--num_seeds", "-num_seeds", type=int, default=20)
     parser.add_argument("--temperature", "-temperature", type=float, default=0.25)
     parser.add_argument("--topk", "-k", type=int, default=100)
     parser.add_argument("--shuffle", "-shuffle", type=bool, default=False)
@@ -167,18 +160,20 @@ def get_args():
     os.makedirs(output_dir, exist_ok=True)
     args.output_dir = output_dir
 
+    assert args.num_seeds > 0, "num_seeds must be greater than 0"
+    assert args.temperature >= 0, "temperature must be greater than 0"
+
     return args
 
 
 def main(args):
-    seed = args.seed
     topk = args.topk
     temperature = args.temperature
     dataset, model_name = args.dataset, args.model_name
     tokenizer_name = args.tokenizer_name
     window_size, step = args.window_size, args.step
     output_dir = args.output_dir
-    output_file = os.path.join(output_dir, f"rank-wo-gpt-Seed-{seed}-Temp-{temperature}.top-{topk}.trec")
+    output_file = os.path.join(output_dir, f"rank-wo-gpt-Temp-{temperature}.top-{topk}.trec")
 
     if os.path.exists(output_file):
         print(f"Reranked runs already exist in {output_file}")
@@ -191,7 +186,6 @@ def main(args):
     model_kwargs = dict(
         model=model_name,
         tokenizer=model_name if not tokenizer_name else tokenizer_name,
-        seed=seed,
         gpu_memory_utilization=0.9,
         tensor_parallel_size=args.tensor_parallel_size,
         dtype="bfloat16",
