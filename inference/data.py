@@ -1,3 +1,4 @@
+import os
 import ir_datasets
 from nirtools.ir import load_runs
 
@@ -17,8 +18,9 @@ def load_data(dataset, topk=100):
 
 
     # DATA_PATH = "/data/crystinaz/src/rank-wo-gpt/data"
-    DATA_PATH = "/mnt/users/x978zhan/paper-backup/rank-wo-gpt/data"
-    runfile = f"{DATA_PATH}/runfiles/{dataset}/bm25.trec"
+    # DATA_PATH = "/mnt/users/x978zhan/paper-backup/rank-wo-gpt/data"
+    DATA_PATH = os.path.dirname(os.path.abspath(__file__))
+    runfile = f"{DATA_PATH}/data/runfiles/{dataset}/bm25.trec"
 
     runs = load_runs(runfile, topk=topk)
     print("Loaded runfile")
