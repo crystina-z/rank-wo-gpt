@@ -17,10 +17,8 @@ def load_data(dataset, topk=100):
         ds = ir_datasets.load(f"{dataset}")
 
 
-    # DATA_PATH = "/data/crystinaz/src/rank-wo-gpt/data"
-    # DATA_PATH = "/mnt/users/x978zhan/paper-backup/rank-wo-gpt/data"
     DATA_PATH = os.path.dirname(os.path.abspath(__file__))
-    runfile = f"{DATA_PATH}/data/runfiles/{dataset}/bm25.trec"
+    runfile = f"{DATA_PATH}/data/{dataset}/bm25.trec"
 
     runs = load_runs(runfile, topk=topk)
     print("Loaded runfile")
