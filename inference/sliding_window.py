@@ -20,14 +20,13 @@ def get_prefix_prompt(query, num):
             {'role': 'user', 'content': f"I will provide you with {num} passages, each indicated by number identifier []. \nRank the passages based on their relevance to query: {query}."},
     ]
 
+
 def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
     query = item['query']
     num = len(item['hits'][rank_start: rank_end])
-
-    max_length = 300
+    max_length = 300 # max length per content
 
     messages = get_prefix_prompt(query, num)
-    more_message_contents = []
     rank = 0
     for hit in item['hits'][rank_start: rank_end]:
         rank += 1
@@ -35,14 +34,13 @@ def create_permutation_instruction(item=None, rank_start=0, rank_end=100):
         content = content.replace('Title: Content: ', '')
         content = content.strip()
 
+        # For Japanese should cut by character: content = content[:int(max_length)]
         content = ' '.join(content.split()[:int(max_length)])
-        more_message_contents.append(f"[{rank}] {content}")
-    assert len(messages) == 1
-    messages[0]['content'] += '\n'.join(more_message_contents)
-    messages[0]['content'] += '\n'
-    messages[0]['content'] += get_post_prompt(query, num)
+        messages.append({'role': 'user', 'content': f"[{rank}] {content}"})
+    messages.append({'role': 'user', 'content': get_post_prompt(query, num)})
 
     return messages
+
 
 def clean_response(response: str):
     new_response = ''
@@ -175,11 +173,9 @@ def main(args):
         model=model_name,
         tokenizer=model_name if not tokenizer_name else tokenizer_name,
         seed=seed,
-        # quantization="fp8",
         gpu_memory_utilization=0.9,
         tensor_parallel_size=args.tensor_parallel_size,
         dtype="bfloat16",
-        # sampling_params=sampling_params,
     )
     model = LLM(**model_kwargs)
 

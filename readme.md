@@ -1,5 +1,9 @@
 # Rank-without-GPT: Building GPT-Independent Listwise Rerankers on Open-Source Large Language Models
 
+<div align="center">
+  <img src="rankwogpt.png" width="400">
+</div>
+
 Disclaimer: This is a *reimplementation* of [Rank-without-GPT: Building GPT-Independent Listwise Rerankers on Open-Source Large Language Models](https://link.springer.com/chapter/10.1007/978-3-031-88711-6_15).
 
 This repository contains code and scripts to run SFT and inference of listwise reranking.
@@ -41,6 +45,8 @@ pip install -r inference/requirements.txt
 
 ### Run Sliding Window
 ```
+model_path=rank-wo-gpt/qwen2_5_7B_lora.cohere-english-v2
+
 python inference/sliding_window.py -device 1 \
     --temperature 0 --seed 42 \
     --dataset msmarco-passage/trec-dl-2019 \
@@ -53,6 +59,15 @@ where `device` controls how many GPU devices to run on,
 and `model_path` is the path to the merged model weights.
 We removed the support of loading LORA weights due to efficiency reasons.
 If you only have adapter weights, [`train/merge_lora.py`](train/merge_lora.py) provides the script to merge LORA weights into the base model.
+
+Below is a list of checkpoints released on HuggingFace and their expected nDCG@10 scores (with `--temperature 0`)
+
+| HuggingFace checkpiont | TREC-DL-2019 | TREC-DL-2020 |
+|--|--|--|
+|[rank-wo-gpt/qwen2_5_3B_full.cohere-english-v2](https://huggingface.co/rank-wo-gpt/qwen2_5_3B_full.cohere-english-v2)| 0.656 | 0.573 |
+|[rank-wo-gpt/qwen2_5_7B_lora.cohere-english-v2](https://huggingface.co/rank-wo-gpt/qwen2_5_7B_lora.cohere-english-v2)| 0.732 | 0.696 |
+|[rank-wo-gpt/llama3_1_8B_lora.cohere-english-v2](https://huggingface.co/rank-wo-gpt/llama3_1_8B_lora.cohere-english-v2)| 0.739	| 0.651 | 
+
 
 
 ### Consistency Regarding Shuffled Inputs 
@@ -78,7 +93,7 @@ If you find the paper or code helpful, please kindly cite:
 @InProceedings{zhang2025rankwogpt,
     author="Zhang, Crystina and Hofst{\"a}tter, Sebastian and Lewis, Patrick and Tang, Raphael and Lin, Jimmy",
     editor="Hauff, Claudia and Macdonald, Craig and Jannach, Dietmar and Kazai, Gabriella and Nardini, Franco Maria and Pinelli, Fabio and Silvestri, Fabrizio and Tonellotto, Nicola",
-    title="Rank-Without-GPT: Building GPT-Independent Listwise Rerankers on Open-Source Large Language Models",
+    title="Rank-Without-GPT: Building GPT-Independent Listwise Rerankers on Open-Source Large Language Models",
     booktitle="Advances in Information Retrieval",
     year="2025",
     publisher="Springer Nature Switzerland",
