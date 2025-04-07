@@ -1,7 +1,7 @@
 # Rank-without-GPT: Building GPT-Independent Listwise Rerankers on Open-Source Large Language Models
 
 <div align="center">
-  <img src="rankwogpt.png" width="400">
+  <img src="rankwogpt.png" width="600">
 </div>
 
 Disclaimer: This is a *reimplementation* of [Rank-without-GPT: Building GPT-Independent Listwise Rerankers on Open-Source Large Language Models](https://link.springer.com/chapter/10.1007/978-3-031-88711-6_15).
